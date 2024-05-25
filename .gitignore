@@ -1,0 +1,8 @@
+*.c
+*.html
+*.pyd
+__pycache__*
+build
+.*
+!__init__.py
+!.gitignore
