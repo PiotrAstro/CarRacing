@@ -1,8 +1,18 @@
+import dataclasses
 import math
-from cmath cimport cos, sin, pi
+from libc.math cimport cos, sin, pi
 import cython
 import numpy as np
-from src.car_simulator.car_python import CarDrawInfo
+# from src.car_simulator.car_python import CarDrawInfo
+
+@dataclasses.dataclass
+class CarDrawInfo:
+    x: int
+    y: int
+    angle_radians: float
+    width: float
+    height: float
+    inactive_ratio: float
 
 cdef class CarCython:
     cdef unsigned char [:, ::1] map_view
@@ -55,7 +65,7 @@ cdef class CarCython:
         self.react()
 
     def nn_state(self) -> np.ndarray:
-        cdef double[::1] rays_degrees_here = self.rays_degrees
+        cdef float[::1] rays_degrees_here = self.rays_degrees
         cdef float[::1] state_here = np.empty(self.rays_degrees.shape[0] + 1, dtype=np.float32)
 
         for i in range(self.rays_degrees.shape[0]):
@@ -122,7 +132,7 @@ cdef class CarCython:
                 self.react(0.0, 0.0)
 
     def get_inactive_ratio(self) -> float:
-        return self.current_inactive_steps / self.inactive_steps
+        return self.current_inactive_steps / (<float> self.inactive_steps)
 
     cdef void _fix_collision(self):
         # get angle of the wall by checking many angles around current position of the car
@@ -131,7 +141,7 @@ cdef class CarCython:
         cdef float checked_distance = self.distance_center_corner * 1.5
         cdef int i
         for i in range(angles.shape[0]):
-            collisions[i] = self._does_collide_one(self.map_view, checked_distance, angles[i])
+            collisions[i] = self._does_collide_one(checked_distance, angles[i])
 
         # get index of start and end of the longest sequence of collisions
         cdef int start = 0
@@ -184,15 +194,15 @@ cdef class CarCython:
 
 
     cdef bint _does_collide(self):
-        return (self._does_collide_one(self.map_view, self.distance_center_corner, self.angle - self.angle_to_corner) or
-                self._does_collide_one(self.map_view, self.distance_center_corner, self.angle + self.angle_to_corner) or
-                self._does_collide_one(self.map_view, self.distance_center_corner, pi + self.angle - self.angle_to_corner) or
-                self._does_collide_one(self.map_view, self.distance_center_corner, pi + self.angle + self.angle_to_corner) or
-                self._does_collide_one(self.map_view, self.width / 2, self.angle + pi/2) or
-                self._does_collide_one(self.map_view, self.width / 2, self.angle - pi/2) or
-                self._does_collide_one(self.map_view, self.height / 2, self.angle) or
-                self._does_collide_one(self.map_view, self.height / 2, self.angle + pi))
-
+        return (self._does_collide_one(self.distance_center_corner, self.angle - self.angle_to_corner) or
+                self._does_collide_one(self.distance_center_corner, self.angle + self.angle_to_corner) or
+                self._does_collide_one(self.distance_center_corner, pi + self.angle - self.angle_to_corner) or
+                self._does_collide_one(self.distance_center_corner, pi + self.angle + self.angle_to_corner) or
+                self._does_collide_one(self.width / 2, self.angle + pi/2) or
+                self._does_collide_one(self.width / 2, self.angle - pi/2) or
+                self._does_collide_one(self.height / 2, self.angle) or
+                self._does_collide_one(self.height / 2, self.angle + pi))
+    @cython.initializedcheck(False)
     @cython.boundscheck(False)
     @cython.wraparound(False)
     cdef bint _does_collide_one(self, double distance, double angle):
@@ -213,8 +223,8 @@ cdef inline int round_to_int(double value):
     """
     return <int>(value + 0.5)
 
-def check_crossed_line(line: ((int, int), (int, int)), previous_position: (float, float),
-                       current_position: (float, float)) -> bool:
+def check_crossed_line(line: tuple[tuple[int, int], tuple[int, int]], previous_position: tuple[float, float],
+                       current_position: tuple[float, float]) -> bool:
     cdef float x1, y1, x2, y2
     cdef float x3, y3, x4, y4
     cdef float denom, ua, ub

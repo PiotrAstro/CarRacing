@@ -128,46 +128,46 @@ cdef class Basic_Car_Environment(Abstract_Environment):
     @cython.wraparound(False)
     cdef float[::1] get_state(self) noexcept nogil:
         cdef double[::1] rays_degrees_here = self.rays_degrees
-                cdef float[::1] state_here = self.state
+        cdef float[::1] state_here = self.state
 
-                for i in range(self.rays_degrees.shape[0]):
-                    state_here[i] = self.get_ray_distance(rays_degrees_here[i]) / self.rays_distances_scale_factor
-                    if state_here[i] > self.ray_input_clip:
-                        state_here[i] = self.ray_input_clip
+        for i in range(self.rays_degrees.shape[0]):
+            state_here[i] = self.get_ray_distance(rays_degrees_here[i]) / self.rays_distances_scale_factor
+            if state_here[i] > self.ray_input_clip:
+                state_here[i] = self.ray_input_clip
 
-                state_here[state_here.shape[0] - 1] = self.car.speed / self.car.max_speed
+        state_here[state_here.shape[0] - 1] = self.car.speed / self.car.max_speed
 
-                # if self._tmp_safe_rewards:
-                #     with gil:
-                #         print(list(state_here), end="  ")
+        # if self._tmp_safe_rewards:
+        #     with gil:
+        #         print(list(state_here), end="  ")
 
-                return state_here
+        return state_here
 
-            @cython.boundscheck(False)
-            @cython.wraparound(False)
-            cdef double get_ray_distance(self, double ray_angle) noexcept nogil:
-                cdef map_view_t[:, ::1] map_view_here = self.map_view
-                cdef double x = self.car.x
-                cdef double y = self.car.y
-                cdef double distance = 0
-                cdef int check_x, check_y
-                cdef double angle = self.car.angle + ray_angle
-                cdef double sin_angle = degree_sin(angle)
-                cdef double cos_angle = degree_cos(angle)
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
+    cdef double get_ray_distance(self, double ray_angle) noexcept nogil:
+        cdef map_view_t[:, ::1] map_view_here = self.map_view
+        cdef double x = self.car.x
+        cdef double y = self.car.y
+        cdef double distance = 0
+        cdef int check_x, check_y
+        cdef double angle = self.car.angle + ray_angle
+        cdef double sin_angle = degree_sin(angle)
+        cdef double cos_angle = degree_cos(angle)
 
-                x = self.car.x
-                y = self.car.y
-                check_x = round_to_int(x)
-                check_y = round_to_int(y)
+        x = self.car.x
+        y = self.car.y
+        check_x = round_to_int(x)
+        check_y = round_to_int(y)
 
-                while check_x >= 0 and check_x < map_view_here.shape[1] and check_y >= 0 and check_y < map_view_here.shape[0] and map_view_here[check_y, check_x] == 0:
-                    x += cos_angle
-                    y -= sin_angle
-                    distance += 1
-                    check_x = round_to_int(x)
-                    check_y = round_to_int(y)
+        while check_x >= 0 and check_x < map_view_here.shape[1] and check_y >= 0 and check_y < map_view_here.shape[0] and map_view_here[check_y, check_x] == 0:
+            x += cos_angle
+            y -= sin_angle
+            distance += 1
+            check_x = round_to_int(x)
+            check_y = round_to_int(y)
 
-                return distance
+        return distance
 
 
     @cython.boundscheck(False)

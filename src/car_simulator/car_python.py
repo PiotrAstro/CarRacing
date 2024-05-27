@@ -1,31 +1,25 @@
 import dataclasses
 import time
 from abc import ABC, abstractmethod
+from pathlib import Path
 from typing import Any, Literal
 
 import keyboard
 import numpy as np
 
-from src.car_simulator.car_cython import CarCython, check_crossed_line
+from src.car_simulator.car_cython import CarCython, check_crossed_line, CarDrawInfo
 from src.car_training.Neural_Network.Raw_Numpy.Raw_Numpy_Models.Normal.Normal_model import Normal_model
 
 Line = tuple[tuple[int, int], tuple[int, int]]
 Steering_Method = Literal["WSAD", "Arrows"]
 
 # randomize numpy seed
-np.random.seed(time.time() * 1000 % 2**32)
-
-@dataclasses.dataclass
-class CarDrawInfo:
-    x: int
-    y: int
-    angle_radians: float
-    width: float
-    height: float
-    inactive_ratio: float
+np.random.seed(int(time.time() * 1000) % 2**32)
 
 
 class CarWrapper(ABC):
+    name: str
+    image: Path
     car: CarCython
     laps: list[int]
     previous_position: tuple[float, float]
@@ -36,8 +30,10 @@ class CarWrapper(ABC):
     time_counter: int
     max_laps: int
 
-    def __init__(self, car_init_data: dict[str, Any], end_line: Line, false_end_line: Line, start_before_end_line: bool, max_laps: int):
+    def __init__(self, car_init_data: dict[str, Any], end_line: Line, false_end_line: Line, start_before_end_line: bool, max_laps: int, name: str, image: Path):
         self.car = CarCython(**car_init_data)
+        self.name = name
+        self.image = image
         self.laps = []
         self.end_line = end_line
         self.false_end_line = false_end_line
@@ -50,6 +46,12 @@ class CarWrapper(ABC):
 
     def get_car_draw_info(self) -> CarDrawInfo:
         return self.car.get_draw_info()
+
+    def get_car_name(self) -> str:
+        return self.name
+
+    def get_car_image(self) -> Path:
+        return self.image
 
     @abstractmethod
     def react(self) -> tuple[float, float]:
@@ -96,8 +98,8 @@ class CarWrapper(ABC):
 class CarPlayerWrapper(CarWrapper):
     steering_method: Steering_Method
 
-    def __init__(self, steering_method: Steering_Method, car_init_data: dict[str, Any], end_line: Line, false_end_line: Line, start_before_end_line: bool, max_laps: int):
-        super().__init__(car_init_data, end_line, false_end_line, start_before_end_line, max_laps)
+    def __init__(self, steering_method: Steering_Method, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.steering_method = steering_method
 
     def react(self) -> tuple[float, float]:
@@ -134,12 +136,9 @@ class CarAIWrapper(CarWrapper):
                  neural_network_structure: dict[str, Any],
                  neural_network_params: dict[str, Any],
                  random_action_prob: float,
-                 car_init_data: dict[str, Any],
-                 end_line: Line,
-                 false_end_line: Line,
-                 start_before_end_line: bool,
-                 max_laps: int):
-        super().__init__(car_init_data, end_line, false_end_line, start_before_end_line, max_laps)
+                 *args,
+                 **kwargs):
+        super().__init__(*args, **kwargs)
         self.model = Normal_model(**neural_network_structure)
         self.model.set_parameters(neural_network_params)
         self.random_action_prob = random_action_prob
@@ -169,45 +168,16 @@ class GameSimulation:
     cars_players: list[CarWrapper]
     max_timesteps: int
     current_timestep: int
+
     def __init__(self,
-                 car_ai_inits: list[tuple[dict[str, Any], dict[str, Any], float]],  # car_init, neural_network_params, percent_of_random_decisions
-                 car_players_init: list[tuple[Steering_Method, dict[str, Any]]],
-                 map: np.ndarray,
-                 neural_network_structure: dict[str, Any],
+                 cars_ai: list[CarAIWrapper],
+                 cars_players: list[CarPlayerWrapper],
                  max_timesteps: int,
-                 end_line: Line,
-                 false_end_line: Line,
-                 start_before_end_line: bool = False,
-                 lap_number: int = 3,
                  ):
         self.max_timesteps = max_timesteps
-        for car_ai_init, _, _ in car_ai_inits:
-            car_ai_init["map"] = map
 
-        self.cars_ai = [
-            CarAIWrapper(
-                neural_network_structure,
-                ai_params,
-                random_action_prob,
-                car_init,
-                end_line,
-                false_end_line,
-                start_before_end_line,
-                lap_number
-            ) for car_init, ai_params, random_action_prob in car_ai_inits]
-
-        for _, car_init in car_players_init:
-            car_init["map"] = map
-
-        self.cars_players = [
-            CarPlayerWrapper(
-                steering_method,
-                car_init,
-                end_line,
-                false_end_line,
-                start_before_end_line,
-                lap_number
-            ) for steering_method, car_init in car_players_init]
+        self.cars_ai = cars_ai
+        self.cars_players = cars_players
 
     def step(self):
         for car in self.cars_ai:
