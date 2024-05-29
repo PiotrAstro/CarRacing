@@ -1,7 +1,7 @@
 import os.path
 from pathlib import Path
 
-IMAGES_DIR = Path(os.path.join(__file__, "..", "..", "images"))
+IMAGES_DIR = Path("images")
 
 PLAYER_CAR_CHANGEABLE_INIT = {
     "max_speed": 5,
@@ -58,6 +58,9 @@ CARS = [
     IMAGES_DIR / "car6.png",
 ]
 
+LAPS_RANGE = (1, 10)
+FPS = 60
+
 MAPS = [
     {
         "name": "Easy Peasy",
@@ -68,6 +71,39 @@ MAPS = [
         "false_end_line": ((0, 0), (0, 100)),
         "start_before_end_line": True,
         "bounding_map": IMAGES_DIR / "map1_walls.png",
-        "image": IMAGES_DIR / "map1.png",
+        "image": IMAGES_DIR / "map_orion.jpg",
+    },
+    {
+        "name": "Harder Squazzle",
+        "x": 0,
+        "y": 0,
+        "start_angle": 0,
+        "end_line": ((0, 0), (0, 100)),
+        "false_end_line": ((0, 0), (0, 100)),
+        "start_before_end_line": False,
+        "bounding_map": IMAGES_DIR / "map1_walls.png",
+        "image": IMAGES_DIR / "map_orion.jpg",
+    },
+    {
+        "name": "Harder Squazzle",
+        "x": 0,
+        "y": 0,
+        "start_angle": 0,
+        "end_line": ((0, 0), (0, 100)),
+        "false_end_line": ((0, 0), (0, 100)),
+        "start_before_end_line": True,
+        "bounding_map": IMAGES_DIR / "map1_walls.png",
+        "image": IMAGES_DIR / "map_orion.jpg",
+    },
+    {
+        "name": "Harder Squazzle",
+        "x": 0,
+        "y": 0,
+        "start_angle": 0,
+        "end_line": ((0, 0), (0, 100)),
+        "false_end_line": ((0, 0), (0, 100)),
+        "start_before_end_line": True,
+        "bounding_map": IMAGES_DIR / "map1_walls.png",
+        "image": IMAGES_DIR / "map_orion.jpg",
     },
 ]

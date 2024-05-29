@@ -1,106 +1,113 @@
-from PySide6.QtWidgets import QMainWindow, QStackedWidget, QPushButton, QVBoxLayout, QWidget, QLabel, QSpacerItem, QSizePolicy
-from PySide6.QtGui import QPixmap, QFont
-from PySide6.QtCore import Qt
+from PySide6.QtGui import QFont, Qt, QPixmap, QPainter
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QFormLayout, QLabel, QComboBox, QPushButton, QSpacerItem, \
+    QSizePolicy
 
-from src.GUI.setting_pages import MapSettingsPage, PlayerSettingsPage, AISettingsPage
-from src.GUI.styles import BUTTON_STYLE, MAIN_MENU_BACKGROUND
+from src.GUI.styles import BUTTON_STYLE, MAIN_MENU_BACKGROUND, WidgetBackgroundImage
+from src.game_control.game_controller import GameController
 
 
-class MainMenu(QMainWindow):
-    def __init__(self, game_controller):
-        super(MainMenu, self).__init__()
-        self.setWindowTitle("AI Car Racing")
-        self.setGeometry(100, 100, 800, 600)
+
+class MainMenuWidget(WidgetBackgroundImage):
+    def __init__(self, game_controller: GameController, parent, main_window):
+        super(MainMenuWidget, self).__init__(MAIN_MENU_BACKGROUND, parent, alpha_overlay=0.0)
         self.game_controller = game_controller
+        self.main_menu = main_window
+        self.initUI()
 
-        # Create the stacked widget
-        self.stacked_widget = QStackedWidget()
+    def initUI(self):
+        self.setLayout(QVBoxLayout())
 
-        # Create the main menu page
-        self.main_menu = QWidget()
-        self.main_menu_layout = QVBoxLayout()
+        # Title label
+        title_label = QLabel("AI Car Racing")
+        title_label.setAlignment(Qt.AlignCenter)
+        title_label.setFont(QFont('Arial', 36))
+        title_label.setStyleSheet("color: white;")
+        self.layout().addWidget(title_label, stretch=1)
 
-        # Add title label
-        self.title_label = QLabel("AI Car Racing")
-        self.title_label.setAlignment(Qt.AlignCenter)
-        self.title_label.setFont(QFont('Arial', 36))
-        self.title_label.setStyleSheet("color: white;")
-        self.main_menu_layout.addWidget(self.title_label, stretch=1)
-
-        # Spacer item to push buttons towards the center
+        # Spacer
         spacer_top = QSpacerItem(20, 40, QSizePolicy.Minimum, QSizePolicy.Expanding)
-        self.main_menu_layout.addItem(spacer_top)
+        self.layout().addItem(spacer_top)
 
-        self.map_button = QPushButton("Choose Map")
-        self.map_button.setStyleSheet(BUTTON_STYLE)
-        self.map_button.clicked.connect(self.show_map_settings)
-        self.main_menu_layout.addWidget(self.map_button, stretch=1)
+        map_button = QPushButton("Choose Map")
+        map_button.setStyleSheet(BUTTON_STYLE)
+        map_button.clicked.connect(self.show_map_settings)
+        self.layout().addWidget(map_button, stretch=1)
 
-        self.player_settings_button = QPushButton("Player Settings")
-        self.player_settings_button.setStyleSheet(BUTTON_STYLE)
-        self.player_settings_button.clicked.connect(self.show_player_settings)
-        self.main_menu_layout.addWidget(self.player_settings_button, stretch=1)
+        player_settings_button = QPushButton("Player Settings")
+        player_settings_button.setStyleSheet(BUTTON_STYLE)
+        player_settings_button.clicked.connect(self.show_player_settings)
+        self.layout().addWidget(player_settings_button, stretch=1)
 
-        self.ai_settings_button = QPushButton("AI Settings")
-        self.ai_settings_button.setStyleSheet(BUTTON_STYLE)
-        self.ai_settings_button.clicked.connect(self.show_ai_settings)
-        self.main_menu_layout.addWidget(self.ai_settings_button, stretch=1)
+        ai_settings_button = QPushButton("AI Settings")
+        ai_settings_button.setStyleSheet(BUTTON_STYLE)
+        ai_settings_button.clicked.connect(self.show_ai_settings)
+        self.layout().addWidget(ai_settings_button, stretch=1)
 
-        self.play_button = QPushButton("Play Game")
-        self.play_button.setStyleSheet(BUTTON_STYLE)
-        self.play_button.clicked.connect(self.play_game)
-        self.main_menu_layout.addWidget(self.play_button, stretch=1)
+        play_button = QPushButton("Play Game")
+        play_button.setStyleSheet(BUTTON_STYLE)
+        play_button.clicked.connect(self.play_game)
+        self.layout().addWidget(play_button, stretch=1)
 
-        # Spacer item to push buttons towards the center
+        # Spacer
         spacer_bottom = QSpacerItem(20, 40, QSizePolicy.Minimum, QSizePolicy.Expanding)
-        self.main_menu_layout.addItem(spacer_bottom)
-
-        # Create a container widget to hold the layout
-        self.container = QWidget()
-        self.container.setLayout(self.main_menu_layout)
-        self.container.setStyleSheet("background: transparent;")
-
-        # Create a central widget with background image
-        central_widget = QWidget()
-        central_widget.setStyleSheet(f"""
-                background-image: url({MAIN_MENU_BACKGROUND});
-                background-repeat: no-repeat;
-                background-position: center;
-                background-size: cover;
-            """)
-        central_layout = QVBoxLayout(central_widget)
-        central_layout.addWidget(self.container)
-
-        self.main_menu.setLayout(central_layout)
-        self.stacked_widget.addWidget(self.main_menu)
-
-        # Create and add settings pages
-        self.map_settings_page = MapSettingsPage(self, self.game_controller)
-        self.player_settings_page = PlayerSettingsPage(self, self.game_controller)
-        self.ai_settings_page = AISettingsPage(self, self.game_controller)
-
-        self.stacked_widget.addWidget(self.map_settings_page)
-        self.stacked_widget.addWidget(self.player_settings_page)
-        self.stacked_widget.addWidget(self.ai_settings_page)
-
-        # Set the stacked widget as the central widget
-        self.setCentralWidget(self.stacked_widget)
-
-    def show_main_menu(self):
-        self.stacked_widget.setCurrentWidget(self.main_menu)
+        self.layout().addItem(spacer_bottom)
 
     def show_map_settings(self):
-        self.stacked_widget.setCurrentWidget(self.map_settings_page)
+        self.main_menu.show_map_settings()
 
     def show_player_settings(self):
-        self.stacked_widget.setCurrentWidget(self.player_settings_page)
+        self.main_menu.show_player_settings()
 
     def show_ai_settings(self):
-        self.stacked_widget.setCurrentWidget(self.ai_settings_page)
+        self.main_menu.show_ai_settings()
 
     def play_game(self):
-        map_setting = self.game_controller.get_map_setting()
-        player_settings = self.game_controller.get_player_settings()
-        ai_setting = self.game_controller.get_ai_setting()
+        self.main_menu.play_game()
 
-        print(f"Starting game with settings: Map={map_setting}, Player={player_settings}, AI={ai_setting}")
+class PlayerSettingsPage(QWidget):
+    def __init__(self, game_controller: GameController, parent, main_window):
+        super(PlayerSettingsPage, self).__init__(parent)
+        # self.game_controller = game_controller
+        # self.layout = QVBoxLayout()
+        # self.form_layout = QFormLayout()
+        # self.character_combo = QComboBox()
+        # self.character_combo.addItems(["Warrior", "Mage", "Archer"])
+        # self.character_combo.setCurrentText(self.game_controller.get_player_settings()["Character"])
+        # self.form_layout.addRow(QLabel("Character"), self.character_combo)
+        # self.difficulty_combo = QComboBox()
+        # self.difficulty_combo.addItems(["Easy", "Medium", "Hard"])
+        # self.difficulty_combo.setCurrentText(self.game_controller.get_player_settings()["Difficulty"])
+        # self.form_layout.addRow(QLabel("Difficulty"), self.difficulty_combo)
+        # self.layout.addLayout(self.form_layout)
+        # self.back_button = QPushButton("Back")
+        # self.back_button.clicked.connect(self.save_and_back)
+        # self.layout.addWidget(self.back_button)
+        # self.setLayout(self.layout)
+
+    def save_and_back(self):
+        settings = {
+            "Character": self.character_combo.currentText(),
+            "Difficulty": self.difficulty_combo.currentText()
+        }
+        # self.game_controller.set_player_settings(settings)
+        self.parent().show_main_menu()
+
+class AISettingsPage(QWidget):
+    def __init__(self, game_controller: GameController, parent, main_window):
+        super(AISettingsPage, self).__init__(parent)
+        # self.game_controller = game_controller
+        # self.layout = QVBoxLayout()
+        # self.form_layout = QFormLayout()
+        # self.ai_level_combo = QComboBox()
+        # self.ai_level_combo.addItems(["Beginner", "Intermediate", "Expert"])
+        # self.ai_level_combo.setCurrentText(self.game_controller.get_ai_setting())
+        # self.form_layout.addRow(QLabel("AI Level"), self.ai_level_combo)
+        # self.layout.addLayout(self.form_layout)
+        # self.back_button = QPushButton("Back")
+        # self.back_button.clicked.connect(self.save_and_back)
+        # self.layout.addWidget(self.back_button)
+        # self.setLayout(self.layout)
+
+    def save_and_back(self):
+        # self.game_controller.set_ai_setting(self.ai_level_combo.currentText())
+        self.parent().show_main_menu()

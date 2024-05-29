@@ -154,7 +154,7 @@ class CarAIDataHolder(CarDataHolder):
 class GameController:
     ai_players: list[CarAIDataHolder]
     player: CarPlayerDataHolder
-    selected_map: int
+    _selected_map: int
     _map_laps: int
     _map_max_timesteps: int
 
@@ -165,26 +165,34 @@ class GameController:
         ]
         self.set_map(0)
 
+    def get_selected_map(self) -> int:
+        return self._selected_map
+
     def set_map(self, map_index: int):
-        self.selected_map = min(max(map_index, 0), len(MAPS) - 1)
+        self._selected_map = min(max(map_index, 0), len(MAPS) - 1)
         self.set_max_laps(3)
 
     def set_max_timesteps(self, max_timesteps: int):
         self._map_max_timesteps = max(max_timesteps, 1)
 
     def set_max_laps(self, max_laps: int):
-        self._max_laps = max(max_laps, 1) if MAPS[self.selected_map]["start_before_end_line"] else 1
+        self._max_laps = max(max_laps, 1) if MAPS[self._selected_map]["start_before_end_line"] else 1
 
     def get_map_name(self) -> str:
-        return MAPS[self.selected_map]["name"]
+        return MAPS[self._selected_map]["name"]
+
+    def get_all_maps(self) -> list[tuple[str, Path]]:
+        return [
+            (map_tmp["name"], map_tmp["image"]) for map_tmp in MAPS
+        ]
 
     def get_map_image(self) -> Path:
-        return MAPS[self.selected_map]["image"]
+        return MAPS[self._selected_map]["image"]
 
     def create_game_simulation(self) -> GameSimulation:
-        img = Image.open(MAPS[self.selected_map]["bounding_map"]).convert('L')  # 'L' stands for luminance
+        img = Image.open(MAPS[self._selected_map]["bounding_map"]).convert('L')  # 'L' stands for luminance
         map_view = np.array(np.array(img) / 255, dtype=np.bool_)
-        map_data_tmp = MAPS[self.selected_map]
+        map_data_tmp = MAPS[self._selected_map]
         x = map_data_tmp["x"]
         y = map_data_tmp["y"]
         start_angle = map_data_tmp["start_angle"]
