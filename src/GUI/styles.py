@@ -112,7 +112,7 @@ class CustomFloatSlider(QWidget):
 
     def set_value(self, value):
         self.slider.setValue(int((value - self.min_value) / self.step))
-        self.update_label(value)
+        # self.update_label(value)
 
 
 class SelectiveWidget(QWidget):
@@ -165,7 +165,7 @@ class SelectiveWidget(QWidget):
         # Draw semi-transparent overlay on hover and selection
         painter.setClipping(False)
         if self.is_selected:
-            painter.setBrush(QColor(140, 80, 40, 100))
+            painter.setBrush(QColor(180, 100, 80, 100))
         elif self.underMouse():
             painter.setBrush(QColor(128, 128, 128, 100))
         else:

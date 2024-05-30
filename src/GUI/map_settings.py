@@ -3,7 +3,7 @@ from pathlib import Path
 from PySide6.QtWidgets import QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QFrame
 from PySide6.QtGui import QFont
 from src.GUI.styles import WidgetBackgroundImage, MAIN_MENU_BACKGROUND, BUTTON_STYLE, CustomFloatSlider, SelectiveWidget
-from src.game_control.constants import MAPS, LAPS_RANGE, FPS
+from src.game_control.constants import MAPS, LAPS_RANGE, SECONDS_RANGE
 
 from src.game_control.game_controller import GameController
 
@@ -48,27 +48,34 @@ class MapSettingsPage(WidgetBackgroundImage):
         self.laps_slider = CustomFloatSlider("Laps", LAPS_RANGE[0], LAPS_RANGE[1], 1)
         map_info_layout.addWidget(self.laps_slider)
 
-        self.time_slider = CustomFloatSlider("Time (seconds)", 10, 300, 10)
+        self.time_slider = CustomFloatSlider("Time (seconds)", SECONDS_RANGE[0], SECONDS_RANGE[1], 10)
         map_info_layout.addWidget(self.time_slider)
 
         # Save button
         save_button = QPushButton("Save")
         save_button.setStyleSheet(BUTTON_STYLE)
-        save_button.clicked.connect(self.save_settings)
+        save_button.clicked.connect(self.show_main_menu)
         map_info_layout.addWidget(save_button)
 
         layout.addLayout(map_info_layout)
         self.setLayout(layout)
 
-    def save_settings(self):
-        self.game_controller.set_max_laps(self.laps_slider.get_value())
-        self.game_controller.set_max_timesteps(self.time_slider.get_value() * FPS)
+
+        self.update_selection(self.game_controller.selected_map)
+        self.laps_slider.set_value(self.game_controller.map_laps)
+        self.time_slider.set_value(self.game_controller.get_max_seconds())
+
+
+    def show_main_menu(self):
+        self.game_controller.map_laps = self.laps_slider.get_value()
+        self.game_controller.set_max_seconds(self.time_slider.get_value())
+        self.main_window.show_main_menu()
 
     def update_selection(self, index: int):
         for map_widget in self.map_widgets:
             if map_widget.index == index:
                 map_widget.set_selected(True)
-                self.game_controller.set_map(index)
+                self.game_controller.selected_map = index
                 self.map_info_label.setText(f"Map: {map_widget.name}")
 
                 if MAPS[index]["start_before_end_line"]:

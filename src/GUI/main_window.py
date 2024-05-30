@@ -1,5 +1,6 @@
 from PySide6.QtWidgets import QMainWindow, QStackedWidget
 
+from src.GUI.game import GamePage
 from src.GUI.main_menu import PlayerSettingsPage, AISettingsPage, MainMenuWidget
 from src.GUI.map_settings import MapSettingsPage
 
@@ -23,10 +24,12 @@ class MainWindow(QMainWindow):
         self.map_settings_page = MapSettingsPage(self.game_controller, self, self)
         self.player_settings_page = PlayerSettingsPage(self.game_controller, self, self)
         self.ai_settings_page = AISettingsPage(self.game_controller, self, self)
+        self.game_page = GamePage(self.game_controller, self, self)
 
         self.stacked_widget.addWidget(self.map_settings_page)
         self.stacked_widget.addWidget(self.player_settings_page)
         self.stacked_widget.addWidget(self.ai_settings_page)
+        self.stacked_widget.addWidget(self.game_page)
 
     def show_main_menu(self):
         self.stacked_widget.setCurrentWidget(self.main_menu_page)
@@ -41,9 +44,6 @@ class MainWindow(QMainWindow):
         self.stacked_widget.setCurrentWidget(self.ai_settings_page)
 
     def play_game(self):
-        map_setting = self.game_controller.get_map_setting()
-        player_settings = self.game_controller.get_player_settings()
-        ai_setting = self.game_controller.get_ai_setting()
-
-        print(f"Starting game with settings: Map={map_setting}, Player={player_settings}, AI={ai_setting}")
+        self.game_page.start_game()
+        self.stacked_widget.setCurrentWidget(self.game_page)
 

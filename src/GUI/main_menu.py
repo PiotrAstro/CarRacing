@@ -6,7 +6,6 @@ from src.GUI.styles import BUTTON_STYLE, MAIN_MENU_BACKGROUND, WidgetBackgroundI
 from src.game_control.game_controller import GameController
 
 
-
 class MainMenuWidget(WidgetBackgroundImage):
     def __init__(self, game_controller: GameController, parent, main_window):
         super(MainMenuWidget, self).__init__(MAIN_MENU_BACKGROUND, parent, alpha_overlay=0.0)

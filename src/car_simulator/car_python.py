@@ -11,17 +11,13 @@ from src.car_simulator.car_cython import CarCython, check_crossed_line, CarDrawI
 from src.car_training.Neural_Network.Raw_Numpy.Raw_Numpy_Models.Normal.Normal_model import Normal_model
 
 Line = tuple[tuple[int, int], tuple[int, int]]
-Steering_Method = Literal["WSAD", "Arrows"]
-
-# randomize numpy seed
-np.random.seed(int(time.time() * 1000) % 2**32)
 
 
 class CarWrapper(ABC):
     name: str
     image: Path
     car: CarCython
-    laps: list[int]
+    _laps: list[int]
     previous_position: tuple[float, float]
     end_line: Line
     false_end_line: Line
@@ -34,7 +30,7 @@ class CarWrapper(ABC):
         self.car = CarCython(**car_init_data)
         self.name = name
         self.image = image
-        self.laps = []
+        self._laps = []
         self.end_line = end_line
         self.false_end_line = false_end_line
         self.end_line_balance = 0
@@ -66,13 +62,23 @@ class CarWrapper(ABC):
 
         if self.car.get_inactive_ratio() == 0.0:
             engine, steering = self.react()
-            if len(self.laps) >= self.max_laps:
-                engine = -1.0
+            if len(self._laps) >= self.max_laps:
+                if self.car.get_speed() < 0.01:
+                    self.car.stop()
+                    engine = 0.0
+                else:
+                    engine = -1.0
             self.car.react(engine, steering)
             self.car.step()
             self._laps_calculations()
         else:
             self.car.step()
+
+    def get_laps(self) -> list[int]:
+        return self._laps.copy()
+
+    def finished(self) -> bool:
+        return len(self._laps) >= self.max_laps
 
     def _laps_calculations(self) -> None:
         new_position = self.car.get_position()
@@ -81,8 +87,10 @@ class CarWrapper(ABC):
             if self.start_before_end_line:
                 self.start_before_end_line = False
                 self.false_end_line_balance = -1
-            if self.end_line_balance == 0:
-                self.laps.append(self.time_counter)
+            elif self.end_line_balance > self.false_end_line_balance:
+                self.end_line_balance = self.false_end_line_balance
+            elif self.end_line_balance == 0:
+                self._laps.append(self.time_counter)
                 self.false_end_line_balance = -1
             elif self.end_line_balance < 0:
                 self.end_line_balance += 1
@@ -90,41 +98,36 @@ class CarWrapper(ABC):
             if self.false_end_line_balance < 0:
                 self.false_end_line_balance += 1
             elif self.false_end_line_balance == 0:
-                self.end_line_balance -= 1
+                self.false_end_line_balance -= 1
 
         self.previous_position = new_position
 
 
 class CarPlayerWrapper(CarWrapper):
-    steering_method: Steering_Method
 
-    def __init__(self, steering_method: Steering_Method, *args, **kwargs):
+    def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.steering_method = steering_method
+        self._previous_steering_action = 0.0
+        self._steering_value = 0.0
 
     def react(self) -> tuple[float, float]:
         engine = 0.0
         steering = 0.0
-        if self.steering_method == "WSAD":
-            if keyboard.is_pressed("w"):
-                engine = 1.0
-            elif keyboard.is_pressed("s"):
-                engine = -1.0
+        if keyboard.is_pressed('up') or keyboard.is_pressed('w') or keyboard.is_pressed('space'):
+            engine = 1.0
+        elif keyboard.is_pressed('down') or keyboard.is_pressed('s'):
+            engine = -1.0
 
-            if keyboard.is_pressed("a"):
-                steering = -1.0
-            elif keyboard.is_pressed("d"):
-                steering = 1.0
-        elif self.steering_method == "Arrows":
-            if keyboard.is_pressed("up"):
-                engine = 1.0
-            elif keyboard.is_pressed("down"):
-                engine = -1.0
+        if keyboard.is_pressed('right') or keyboard.is_pressed('d'):
+            steering = -1.0
+        elif keyboard.is_pressed('left') or keyboard.is_pressed('a'):
+            steering = 1.0
+        if steering != self._previous_steering_action:
+            self._steering_value = 0.11
+            self._previous_steering_action = steering
+        self._steering_value += 0.11
+        steering = np.clip(steering * self._steering_value ** 2, -1.0, 1.0)
 
-            if keyboard.is_pressed("left"):
-                steering = -1.0
-            elif keyboard.is_pressed("right"):
-                steering = 1.0
         return engine, steering
 
 
@@ -144,22 +147,30 @@ class CarAIWrapper(CarWrapper):
         self.random_action_prob = random_action_prob
 
     def react(self) -> tuple[float, float]:
-        nn_input = self.car.nn_state()
+        nn_input = np.array(self.car.nn_state().reshape(1, -1), dtype=np.float32)
 
         if np.random.rand() < self.random_action_prob:
             nn_output = np.random.uniform(-1.0, 1.0, 4)
         else:
-            nn_output = self.model.p_forward_pass(nn_input)
+            nn_output = self.model.p_forward_pass(nn_input)[0]
 
         max_index = np.argmax(nn_output[:3])
         steering = 0.0
         match max_index:
-            case 0:
-                steering = 1.0
             case 1:
+                steering = 1.0
+            case 2:
                 steering = -1.0
 
+        # max_index_engine = np.argmax(nn_output[3:])
+        # engine = 0.0
+        # match max_index_engine:
+        #     case 0:
+        #         engine = 1.0
+        #     case 1:
+        #         engine = -1.0
         engine = nn_output[3]
+
         return engine, steering
 
 
@@ -175,6 +186,7 @@ class GameSimulation:
                  max_timesteps: int,
                  ):
         self.max_timesteps = max_timesteps
+        self.current_timestep = 1
 
         self.cars_ai = cars_ai
         self.cars_players = cars_players
@@ -187,4 +199,4 @@ class GameSimulation:
         self.current_timestep += 1
 
     def is_finished(self) -> bool:
-        return all([len(car.laps) >= car.max_laps for car in self.cars_players]) or self.current_timestep >= self.max_timesteps
+        return all([car.finished() for car in self.cars_players]) or self.current_timestep >= self.max_timesteps

@@ -1,4 +1,5 @@
 import dataclasses
+import pickle
 from abc import abstractmethod
 from pathlib import Path
 from typing import Literal
@@ -6,10 +7,10 @@ from typing import Literal
 import numpy as np
 from PIL import Image
 
-from src.car_simulator.car_python import Steering_Method, CarWrapper, Line, CarAIWrapper, CarPlayerWrapper, \
+from src.car_simulator.car_python import CarWrapper, Line, CarAIWrapper, CarPlayerWrapper, \
     GameSimulation
 from src.game_control.constants import CAR_CHANGEABLE_RANGE, AI_STRUCTURE, PLAYER_CAR_CHANGEABLE_INIT, CARS, MAPS, \
-    AI_CAR_CHANGEABLE_INIT, MAX_AI_CARS
+    AI_CAR_CHANGEABLE_INIT, MAX_AI_CARS, FPS, DEFAULT_SECONDS, NEURAL_NETWORKS_DIR
 
 
 class CarDataHolder:
@@ -50,12 +51,10 @@ class CarDataHolder:
 
 @dataclasses.dataclass
 class CarPlayerDataHolder(CarDataHolder):
-    steering_method: Steering_Method
 
-    def __init__(self, name: str, image: Path, steering_method: Steering_Method = "Arrows"):
+    def __init__(self, name: str, image: Path):
         self.name = name
         self.image = image
-        self.steering_method = steering_method
         self.max_speed = PLAYER_CAR_CHANGEABLE_INIT["max_speed"]
         self.min_speed = PLAYER_CAR_CHANGEABLE_INIT["min_speed"]
         self.acceleration = PLAYER_CAR_CHANGEABLE_INIT["acceleration"]
@@ -83,7 +82,6 @@ class CarPlayerDataHolder(CarDataHolder):
         }
 
         return CarPlayerWrapper(
-            steering_method=self.steering_method,
             car_init_data=car_init_data,
             end_line=end_line,
             false_end_line=false_end_line,
@@ -135,12 +133,14 @@ class CarAIDataHolder(CarDataHolder):
         }
 
         # TODO: load correct ai model and set random action prob
-        random_action_prob = 0.1
+        with open(NEURAL_NETWORKS_DIR / "best_individual_1717031742_f1550.7.pkl", "rb") as f:
+            nn_params = pickle.load(f)
+        random_action_prob = 0.0
 
 
         return CarAIWrapper(
             neural_network_structure=AI_STRUCTURE["neural_network"],
-            neural_network_params=AI_STRUCTURE["neural_network"],
+            neural_network_params=nn_params,
             random_action_prob=random_action_prob,
             car_init_data=car_init_data,
             end_line=end_line,
@@ -154,32 +154,27 @@ class CarAIDataHolder(CarDataHolder):
 class GameController:
     ai_players: list[CarAIDataHolder]
     player: CarPlayerDataHolder
-    _selected_map: int
-    _map_laps: int
-    _map_max_timesteps: int
+    selected_map: int
+    map_laps: int
+    map_max_timesteps: int
 
     def __init__(self):
         self.player = CarPlayerDataHolder("Player", CARS[0])
         self.ai_players = [
             CarAIDataHolder(f"AI {i}", CARS[i % len(CARS)]) for i in range(1, MAX_AI_CARS + 1)
         ]
-        self.set_map(0)
+        self.selected_map = 0
+        self.map_laps = 3 if MAPS[self.selected_map]["start_before_end_line"] else 1
+        self.map_max_timesteps = DEFAULT_SECONDS * FPS
 
-    def get_selected_map(self) -> int:
-        return self._selected_map
+    def set_max_seconds(self, max_timesteps: int):
+        self.map_max_timesteps = max(max_timesteps * FPS, 1)
 
-    def set_map(self, map_index: int):
-        self._selected_map = min(max(map_index, 0), len(MAPS) - 1)
-        self.set_max_laps(3)
-
-    def set_max_timesteps(self, max_timesteps: int):
-        self._map_max_timesteps = max(max_timesteps, 1)
-
-    def set_max_laps(self, max_laps: int):
-        self._max_laps = max(max_laps, 1) if MAPS[self._selected_map]["start_before_end_line"] else 1
+    def get_max_seconds(self):
+        return self.map_max_timesteps / FPS
 
     def get_map_name(self) -> str:
-        return MAPS[self._selected_map]["name"]
+        return MAPS[self.selected_map]["name"]
 
     def get_all_maps(self) -> list[tuple[str, Path]]:
         return [
@@ -187,12 +182,12 @@ class GameController:
         ]
 
     def get_map_image(self) -> Path:
-        return MAPS[self._selected_map]["image"]
+        return MAPS[self.selected_map]["image"]
 
     def create_game_simulation(self) -> GameSimulation:
-        img = Image.open(MAPS[self._selected_map]["bounding_map"]).convert('L')  # 'L' stands for luminance
+        img = Image.open(MAPS[self.selected_map]["bounding_map"]).convert('L')  # 'L' stands for luminance
         map_view = np.array(np.array(img) / 255, dtype=np.bool_)
-        map_data_tmp = MAPS[self._selected_map]
+        map_data_tmp = MAPS[self.selected_map]
         x = map_data_tmp["x"]
         y = map_data_tmp["y"]
         start_angle = map_data_tmp["start_angle"]
@@ -209,7 +204,7 @@ class GameController:
                 end_line=end_line,
                 false_end_line=false_end_line,
                 start_before_end_line=start_before_end_line,
-                max_laps=self._max_laps
+                max_laps=self.map_laps
             ) for ai in self.ai_players if ai.active
         ]
 
@@ -222,13 +217,13 @@ class GameController:
                 end_line=end_line,
                 false_end_line=false_end_line,
                 start_before_end_line=start_before_end_line,
-                max_laps=self._max_laps
+                max_laps=self.map_laps
             )
         ]
 
         return GameSimulation(
             cars_ai=cars_ai,
             cars_players=players,
-            max_timesteps=self._map_max_timesteps
+            max_timesteps=self.map_max_timesteps
         )
 

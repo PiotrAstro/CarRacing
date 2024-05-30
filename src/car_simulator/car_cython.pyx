@@ -14,6 +14,7 @@ class CarDrawInfo:
     height: float
     inactive_ratio: float
 
+
 cdef class CarCython:
     cdef unsigned char [:, ::1] map_view
     cdef float x, y, angle, speed, max_speed, min_speed, acceleration, turn_speed
@@ -51,19 +52,22 @@ cdef class CarCython:
         self.turn_speed = math.radians(turn_speed)
         self.inactive_steps = inactive_steps
         self.rays_degrees = np.array(
-            [math.radians(ray) for ray in rays_degrees], dtype=np.float64
+            [math.radians(ray) for ray in rays_degrees], dtype=np.float32
         )
         self.map_view = map_view
-        self.distance_center_corner = math.sqrt((self.width / 2) ** 2 + (self.height / 2) ** 2)
-        self.angle_to_corner = math.degrees(math.atan2(self.width / 2, self.height / 2))
         self.width = width
         self.height = height
         self.rays_distances_scale_factor = rays_distances_scale_factor
         self.ray_input_clip = ray_input_clip
         self.current_inactive_steps = 0
 
-        self.react()
+        self.distance_center_corner = math.sqrt((self.width / 2) ** 2 + (self.height / 2) ** 2)
+        self.angle_to_corner = math.atan2(self.width / 2, self.height / 2)
 
+        self.react(0.0, 0.0)
+
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
     def nn_state(self) -> np.ndarray:
         cdef float[::1] rays_degrees_here = self.rays_degrees
         cdef float[::1] state_here = np.empty(self.rays_degrees.shape[0] + 1, dtype=np.float32)
@@ -111,6 +115,11 @@ cdef class CarCython:
     def react(self, float engine, float steering) -> None:
         engine = max(-1.0, min(1.0, engine))
         steering = max(-1.0, min(1.0, steering))
+
+        # Wheel traction
+        cdef float traction = self.speed / self.max_speed
+        engine -= traction
+
         self.speed += engine * self.acceleration
         self.speed = max(self.min_speed, min(self.max_speed, self.speed))
         self.angle += steering * self.turn_speed
@@ -118,6 +127,12 @@ cdef class CarCython:
             self.angle -= 2 * pi
         elif self.angle < 0:
             self.angle += 2 * pi
+
+    def get_speed(self) -> float:
+        return self.speed
+
+    def stop(self) -> None:
+        self.speed = 0.0
 
     def step(self) -> None:
         if self.current_inactive_steps > 0:
@@ -134,9 +149,12 @@ cdef class CarCython:
     def get_inactive_ratio(self) -> float:
         return self.current_inactive_steps / (<float> self.inactive_steps)
 
+
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
     cdef void _fix_collision(self):
         # get angle of the wall by checking many angles around current position of the car
-        cdef float[::1] angles = np.linspace(0, 2 * pi, 90, endpoint=False)
+        cdef float[::1] angles = np.linspace(0, 2 * pi, 90, endpoint=False, dtype=np.float32)
         cdef unsigned char [::1] collisions = np.empty(angles.shape[0], dtype=np.uint8)
         cdef float checked_distance = self.distance_center_corner * 1.5
         cdef int i
@@ -166,7 +184,13 @@ cdef class CarCython:
                 current_length = 0
 
         # get angle of the wall
-        cdef float perpendicular_wall_angle = (angles[start] + angles[end]) / 2
+        cdef float angle_between = angles[end] - angles[start]
+        if angle_between < 0:
+            angle_between += 2 * pi
+        if angle_between > pi:
+            angle_between = 2 * pi - angle_between
+
+        cdef float perpendicular_wall_angle = (angles[start] + angle_between / 2)
         cdef float wall_angle = perpendicular_wall_angle + pi / 2
         if wall_angle > 2 * pi:
             wall_angle -= 2 * pi
@@ -174,17 +198,11 @@ cdef class CarCython:
         # check if I should set the angle to the wall angle or to the opposite angle
         cdef float angle_diff = abs(self.angle - wall_angle)
         if angle_diff > pi / 2 and angle_diff < 3 / 2 * pi:
-            wall_angle -= 2 * pi
+            wall_angle -= pi
         self.angle = wall_angle
 
         # calculate distance from current car position to the wall
-        cdef move_distance
-        cdef float angle_between = angles[end] - angles[start]
-        if angle_between < 0:
-            angle_between += 2 * pi
-        if angle_between > pi:
-            angle_between = 2 * pi - angle_between
-        move_distance = 1.5 * self.width - self.distance_center_corner / cos(angle_between / 2)
+        cdef move_distance = 1.0 * self.width - self.distance_center_corner * cos(angle_between / 2)
         perpendicular_wall_angle -= pi
         self.x += move_distance * cos(perpendicular_wall_angle)
         self.y -= move_distance * sin(perpendicular_wall_angle)
