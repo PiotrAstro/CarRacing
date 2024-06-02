@@ -1,45 +1,45 @@
 import os.path
 import time
 from pathlib import Path
+from typing import Literal
 
 import numpy as np
 
 # randomize numpy seed
 np.random.seed(int(time.time() * 1000) % 2**32)
 
+AI_MODES = Literal["easy", "medium", "hard"]
 NEURAL_NETWORKS_DIR = Path("networks")
 IMAGES_DIR = Path("images")
 
 PLAYER_CAR_CHANGEABLE_INIT = {
-    "max_speed": 10,
-    "min_speed": -1,
-    "acceleration": 0.1,
-    "turn_speed": 2,
+    "max_speed": 10.0,
+    "min_speed": -1.0,
+    "acceleration": 0.4,
+    "turn_speed": 2.0,
     "inactive_steps": 60,
-    "width": 10,
-    "height": 20,
+    "width_height": (20, 40),
 }
 
-MAX_AI_CARS = 3
+MAX_AI_CARS = 4
 
 AI_CAR_CHANGEABLE_INIT = {
-    "max_speed": 6,
-    "min_speed": -1.2,
-    "acceleration": 0.04,
-    "turn_speed": 1.2,
+    "max_speed": [10, 20],
+    "min_speed": -1.0,
+    "acceleration": [0.1, 0.2],
+    "turn_speed": 2.0,
     "inactive_steps": 120,
-    "width": 35,
-    "height": 70,
+    "width_height": [(10, 20), (20, 40)],
+    "mode": ["easy", "medium"],
 }
 
-CAR_CHANGEABLE_RANGE = {
-    "max_speed": (0, 10),
-    "min_speed": (-2, 0),
-    "acceleration": (0, 0.2),
-    "turn_speed": (0, 0.2),
-    "inactive_steps": (0, 600),
-    "width": (5, 35),
-    "height": (10, 70),
+# min, max step, min and max are included
+CAR_CHANGEABLE_VALUES = {
+    "max_speed": [5.0, 10.0, 20.0],
+    "acceleration": [0.1, 0.2, 0.4],
+    "width_height": [(10, 20), (20, 40), (35, 60)],
+    "turn_speed": [1.0, 2.0, 4.0],  # [1.0, 2.0, 4.0],
+    "inactive_steps": [i for i in range(0, 660, 60)],
 }
 
 AI_STRUCTURE = {
@@ -57,12 +57,12 @@ AI_STRUCTURE = {
 }
 
 CARS = [
-    IMAGES_DIR / "car1.png",
-    IMAGES_DIR / "car2.png",
-    IMAGES_DIR / "car3.png",
-    IMAGES_DIR / "car4.png",
-    IMAGES_DIR / "car5.png",
-    IMAGES_DIR / "car6.png",
+    IMAGES_DIR / "spaceship0.png",
+    IMAGES_DIR / "spaceship1.png",
+    IMAGES_DIR / "spaceship2.png",
+    IMAGES_DIR / "spaceship3.png",
+    IMAGES_DIR / "spaceship4.png",
+    IMAGES_DIR / "spaceship5.png",
 ]
 
 LAPS_RANGE = (1, 10)

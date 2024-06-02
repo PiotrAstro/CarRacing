@@ -1,16 +1,46 @@
 import dataclasses
 import pickle
+import random
 from abc import abstractmethod
 from pathlib import Path
-from typing import Literal
+from typing import Literal, Any
 
 import numpy as np
 from PIL import Image
 
 from src.car_simulator.car_python import CarWrapper, Line, CarAIWrapper, CarPlayerWrapper, \
     GameSimulation
-from src.game_control.constants import CAR_CHANGEABLE_RANGE, AI_STRUCTURE, PLAYER_CAR_CHANGEABLE_INIT, CARS, MAPS, \
-    AI_CAR_CHANGEABLE_INIT, MAX_AI_CARS, FPS, DEFAULT_SECONDS, NEURAL_NETWORKS_DIR
+from src.game_control.constants import AI_STRUCTURE, PLAYER_CAR_CHANGEABLE_INIT, CARS, MAPS, \
+    AI_CAR_CHANGEABLE_INIT, MAX_AI_CARS, FPS, DEFAULT_SECONDS, NEURAL_NETWORKS_DIR, AI_MODES
+
+class ModelAISelector:
+    def __init__(self):
+        # open all models from NEURAL_NETWORKS_DIR
+        models_dirs = NEURAL_NETWORKS_DIR.glob("*.pkl")
+        self.models = []
+        for model_dir in models_dirs:
+            with open(model_dir, "rb") as f:
+                self.models.append(pickle.load(f))
+
+    def find_fittest_model(self, max_speed: float, acceleration: float, width: int, height: int, turn_speed: float) -> dict[str, Any]:
+        sorted_models = sorted(self.models, key=lambda x: self._mark_model(x, max_speed, acceleration, width, height, turn_speed), reverse=True)
+        return sorted_models[0]["neural_network_params"]
+
+    def _mark_model(self, model, max_speed: float, acceleration: float, width: int, height: int, turn_speed: float):
+        model_kwargs = model["universal_kwargs"]
+        rank = 0
+        if model_kwargs["car_dimensions"] == (width, height):
+            rank += 10
+        elif model_kwargs["car_dimensions"][0] > width or model_kwargs["car_dimensions"][1] > height:
+            rank += 9
+
+        if model_kwargs["max_speed"] == max_speed:
+            rank += 1
+        if model_kwargs["speed_change"] == acceleration:
+            rank += 1
+        if model_kwargs["angle_max_change"] == turn_speed:
+            rank += 1
+        return rank
 
 
 class CarDataHolder:
@@ -21,8 +51,8 @@ class CarDataHolder:
     acceleration: float
     turn_speed: float
     inactive_steps: int
-    width: float
-    height: float
+    width: int
+    height: int
 
     # def set_min_speed(self, min_speed: float):
     #     self.min_speed = min(max(min_speed, CAR_CHANGEABLE_RANGE["min_speed"][0]), CAR_CHANGEABLE_RANGE["min_speed"][1])
@@ -49,6 +79,17 @@ class CarDataHolder:
     def create_car_wrapper(self, x: float, y: float, start_angle: float, map_view: np.ndarray, end_line: Line, false_end_line: Line, start_before_end_line: bool, max_laps: int) -> CarWrapper:
         pass
 
+    def load_dict(self, data: dict[str, Any]):
+        self.max_speed = data["max_speed"]
+        self.min_speed = data["min_speed"]
+        self.acceleration = data["acceleration"]
+        self.turn_speed = data["turn_speed"]
+        self.inactive_steps = data["inactive_steps"]
+        self.width, self.height = data["width_height"]
+        self.name = data["name"]
+        self.image = Path(data["image"])
+
+
 @dataclasses.dataclass
 class CarPlayerDataHolder(CarDataHolder):
 
@@ -60,8 +101,7 @@ class CarPlayerDataHolder(CarDataHolder):
         self.acceleration = PLAYER_CAR_CHANGEABLE_INIT["acceleration"]
         self.turn_speed = PLAYER_CAR_CHANGEABLE_INIT["turn_speed"]
         self.inactive_steps = PLAYER_CAR_CHANGEABLE_INIT["inactive_steps"]
-        self.width = PLAYER_CAR_CHANGEABLE_INIT["width"]
-        self.height = PLAYER_CAR_CHANGEABLE_INIT["height"]
+        self.width, self.height = PLAYER_CAR_CHANGEABLE_INIT["width_height"]
 
     def create_car_wrapper(self, x: float, y: float, start_angle: float, map_view: np.ndarray, end_line: Line, false_end_line: Line, start_before_end_line: bool, max_laps: int) -> CarPlayerWrapper:
         car_init_data = {
@@ -91,28 +131,34 @@ class CarPlayerDataHolder(CarDataHolder):
             image=self.image,
         )
 
-    def set_name(self, name: str):
-        if name != "":
-            self.name = name[:20 if len(name) > 20 else len(name)]
-
 
 @dataclasses.dataclass
 class CarAIDataHolder(CarDataHolder):
-    mode: Literal["easy", "medium", "hard"]
+    mode: AI_MODES
     active: bool
 
-    def __init__(self, name: str, image: Path, mode: Literal["easy", "medium", "hard"] = "easy"):
+    def __init__(self, name: str, image: Path, model_selector: ModelAISelector):
         self.name = name
         self.image = image
-        self.mode = mode
         self.active = True
-        self.max_speed = AI_CAR_CHANGEABLE_INIT["max_speed"]
-        self.min_speed = AI_CAR_CHANGEABLE_INIT["min_speed"]
-        self.acceleration = AI_CAR_CHANGEABLE_INIT["acceleration"]
-        self.turn_speed = AI_CAR_CHANGEABLE_INIT["turn_speed"]
-        self.inactive_steps = AI_CAR_CHANGEABLE_INIT["inactive_steps"]
-        self.width = AI_CAR_CHANGEABLE_INIT["width"]
-        self.height = AI_CAR_CHANGEABLE_INIT["height"]
+
+        self.max_speed = self._get_from_consts("max_speed")
+        self.min_speed = self._get_from_consts("min_speed")
+        self.acceleration = self._get_from_consts("acceleration")
+        self.turn_speed = self._get_from_consts("turn_speed")
+        self.inactive_steps = self._get_from_consts("inactive_steps")
+        self.width, self.height = self._get_from_consts("width_height")
+        self.mode = self._get_from_consts("mode")
+        self.model_selector = model_selector
+
+    def _get_from_consts(self, key: str):
+        value = AI_CAR_CHANGEABLE_INIT[key]
+        return value if not isinstance(value, list) else random.choice(value)
+
+    def load_dict(self, data: dict[str, Any]):
+        super().load_dict(data)
+        self.active = data["active"]
+        self.mode = data["mode"]
 
     def create_car_wrapper(self, x: float, y: float, start_angle: float, map_view: np.ndarray, end_line: Line, false_end_line: Line, start_before_end_line: bool, max_laps: int) -> CarAIWrapper:
         car_init_data = {
@@ -132,10 +178,22 @@ class CarAIDataHolder(CarDataHolder):
             "rays_degrees": AI_STRUCTURE["rays_degrees"],
         }
 
-        # TODO: load correct ai model and set random action prob
-        with open(NEURAL_NETWORKS_DIR / "best_individual_1717031742_f1550.7.pkl", "rb") as f:
-            nn_params = pickle.load(f)
+        nn_params = self.model_selector.find_fittest_model(
+            max_speed=self.max_speed,
+            acceleration=self.acceleration,
+            width=self.width,
+            height=self.height,
+            turn_speed=self.turn_speed
+        )
+
         random_action_prob = 0.0
+        match self.mode:
+            case "easy":
+                random_action_prob = 0.5
+            case "medium":
+                random_action_prob = 0.25
+            case "hard":
+                random_action_prob = 0.001
 
 
         return CarAIWrapper(
@@ -157,15 +215,25 @@ class GameController:
     selected_map: int
     map_laps: int
     map_max_timesteps: int
+    model_ai_selector: ModelAISelector
 
     def __init__(self):
+        self.model_ai_selector = ModelAISelector()
+
         self.player = CarPlayerDataHolder("Player", CARS[0])
         self.ai_players = [
-            CarAIDataHolder(f"AI {i}", CARS[i % len(CARS)]) for i in range(1, MAX_AI_CARS + 1)
+            CarAIDataHolder(f"AI {i}", CARS[i % len(CARS)], self.model_ai_selector) for i in range(1, MAX_AI_CARS + 1)
         ]
         self.selected_map = 0
         self.map_laps = 3 if MAPS[self.selected_map]["start_before_end_line"] else 1
         self.map_max_timesteps = DEFAULT_SECONDS * FPS
+
+    # def save_state(self):
+    #     state = {
+    #         "ai_players": [ai.get
+    #     }
+    #     with open("game_state.pkl", "wb") as f:
+    #         pickle.dump(self, f)
 
     def set_max_seconds(self, max_timesteps: int):
         self.map_max_timesteps = max(max_timesteps * FPS, 1)
@@ -204,7 +272,7 @@ class GameController:
                 end_line=end_line,
                 false_end_line=false_end_line,
                 start_before_end_line=start_before_end_line,
-                max_laps=self.map_laps
+                max_laps=self.map_laps,
             ) for ai in self.ai_players if ai.active
         ]
 

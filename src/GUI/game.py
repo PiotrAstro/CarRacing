@@ -1,10 +1,9 @@
 import time
-
 from src.car_simulator.car_cython import CarDrawInfo
 from src.game_control.constants import FPS
 from src.game_control.game_controller import GameController
 
-from PySide6.QtCore import QTimer, QRectF
+from PySide6.QtCore import QTimer, QRectF, Qt
 from PySide6.QtGui import QPainter, QColor, QPixmap, QFont
 from PySide6.QtWidgets import QWidget, QLabel, QVBoxLayout, QHBoxLayout
 import math
@@ -26,6 +25,8 @@ class GamePage(QWidget):
     def start_game(self):
         self.simulation = self.game_controller.create_game_simulation()
         self.cars = self.simulation.cars_ai + [self.simulation.cars_players[0]]
+        self.cars_images = [QPixmap(car.image) for car in self.cars]
+        self.car_names = [car.name for car in self.cars]
         self.map_pixmap = QPixmap(self.game_controller.get_map_image())
         self.game_running = True
         self.update_data()
@@ -80,6 +81,7 @@ class GamePage(QWidget):
     def paintEvent(self, event):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing)
+        painter.setRenderHint(QPainter.SmoothPixmapTransform)
 
         # Calculate the region to display centered on the main car
         map_rect = self.map_pixmap.rect()
@@ -101,10 +103,10 @@ class GamePage(QWidget):
         painter.drawPixmap(0, 0, cropped_map)
 
         # Draw the cars
-        for car_info in cars_info:
-            self.draw_car(painter, car_info, crop_x, crop_y)
+        for car_info, image, name in zip(cars_info, self.cars_images, self.car_names):
+            self.draw_car(painter, car_info, image, name, crop_x, crop_y)
 
-    def draw_car(self, painter, car_info: CarDrawInfo, crop_x: int, crop_y: int):
+    def draw_car(self, painter, car_info: CarDrawInfo, car_image, car_name, crop_x: int, crop_y: int):
         # Calculate car position relative to the cropped view
         car_x = car_info.x - crop_x
         car_y = car_info.y - crop_y
@@ -114,33 +116,49 @@ class GamePage(QWidget):
         car_height = car_info.height
 
         # Calculate the current color based on the inactive ratio
-        current_color = self.calculate_pulsing_color(car_info.inactive_ratio)
 
         # Save painter state
         painter.save()
 
-        # Move and rotate the painter to draw the car
         painter.translate(car_x, car_y)
-        painter.rotate(math.degrees(-car_info.angle_radians) + 90)
+        pulsing_opacity = self.calculate_pulsing_opacity(car_info.inactive_ratio)
 
-        # Draw the car as a rectangle
-        rect = QRectF(-car_width / 2, -car_height / 2, car_width, car_height)
-        painter.setBrush(current_color)
-        painter.drawRect(rect)
+        # Draw the player name above the car
+        text_width = painter.fontMetrics().horizontalAdvance(car_name)
+        padding = 10  # Add padding to the width
+        text_rect = QRectF(-text_width / 2 - padding / 2, -car_height / 2 - 20 - padding, text_width + padding, 20)
+        painter.setOpacity(1)
+        painter.setPen(
+            QColor(255, 255, 255) if pulsing_opacity == 1 else QColor(255, 0, 0)
+        )  # White color for text
+        painter.setFont(QFont('Arial', 10, QFont.Bold))
+        painter.drawText(text_rect, Qt.AlignCenter, car_name)
+
+        # Move and rotate the painter to draw the car
+        painter.rotate(math.degrees(-car_info.angle_radians))
+
+        painter.setOpacity(pulsing_opacity)  # Adjust opacity based on inactive ratio
+        painter.drawPixmap(-car_height / 2, - car_width / 2, car_height, car_width, car_image)
+
+
 
         # Restore painter state
         painter.restore()
 
-    def calculate_pulsing_color(self, inactive_ratio):
-        if inactive_ratio <= 0:
-            return QColor(255, 0, 0)  # Solid red
+    def calculate_pulsing_opacity(self, inactive_ratio) -> float:
+        if inactive_ratio == 0.0:
+            return 1.0
 
         # Calculate the pulsing interval based on the inactive ratio
-        pulse_interval = inactive_ratio * 20  # Adjust the multiplier to change the pulse speed
-        ratio = time.time() * FPS / pulse_interval
+        pulse_interval = 0.3  # math.sqrt(inactive_ratio) / 2  # Adjust the multiplier to change the pulse speed
+
+        seconds = time.time()
+        seconds = seconds - seconds // 1
+        ratio = seconds / pulse_interval
+
         phase = ratio - ratio // 1  # Ensure phase is between 0 and 1
 
         if phase < 0.5:
-            return QColor(255, 0, 0)  # Red
+            return 0.0
         else:
-            return QColor(255, 255, 255)  # White
+            return 1.0

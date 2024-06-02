@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+from typing import Any, Literal
 
 from PySide6.QtCore import Signal
 from PySide6.QtGui import QPixmap, QPainter, Qt, QColor, QPainterPath, QBrush, QFont
@@ -115,17 +116,76 @@ class CustomFloatSlider(QWidget):
         # self.update_label(value)
 
 
+class CustomSequenceSlider(QWidget):
+    def __init__(self, label: str, sequence: list[Any], parent=None):
+        super(CustomSequenceSlider, self).__init__(parent)
+        self.label_text = label
+        self.sequence = sequence
+        self.initUI()
+
+    def initUI(self):
+        layout = QVBoxLayout(self)
+
+        value = self.sequence[0]
+        value_str = str(value) if not isinstance(value, float) else f"{value:.2f}"
+        self.label = QLabel(f"{self.label_text}: {value_str}")
+        self.update_label(0)
+        self.label.setStyleSheet("color: white; font-size: 18px; font-weight: bold;")
+        layout.addWidget(self.label)
+
+        self.slider = QSlider(Qt.Horizontal)
+        self.slider.setMinimum(0)
+        self.slider.setMaximum(len(self.sequence) - 1)
+        self.slider.setTickInterval(1)
+        self.slider.setTickPosition(QSlider.TicksBelow)
+        self.slider.valueChanged.connect(self.update_label)
+        layout.addWidget(self.slider)
+
+    def update_label(self, value):
+        value = self.sequence[value]
+        value_str = str(value) if not isinstance(value, float) else f"{value:.2f}"
+        self.label.setText(f"{self.label_text}: {value_str}")
+
+    def get_value(self):
+        value = self.slider.value()
+        return self.sequence[value]
+
+    def update_range(self, min_value, max_value):
+        self.min_value = min_value
+        self.max_value = max_value
+        self.slider.setMaximum(int((self.max_value - self.min_value) / self.step))
+        self.update_label(self.slider.value())
+        if min_value == max_value:
+            self.slider.setDisabled(True)
+        else:
+            self.slider.setDisabled(False)
+
+    def set_value(self, value):
+        found_value_index = 0
+        for i, seq_value in enumerate(self.sequence):
+            if seq_value == value:
+                found_value_index = i
+                break
+
+        self.slider.setValue(found_value_index)
+        self.update_label(found_value_index)
+
+
 class SelectiveWidget(QWidget):
     name: str
     index: int
     clicked = Signal(int)
+    active: bool
+    mode: Literal["full", "fit"]
 
-    def __init__(self, name: str, image_path: Path | str, index: int, parent=None):
+    def __init__(self, name: str, image_path: Path | str, index: int, parent=None, active=True, mode: Literal["full", "fit"] = "full"):
         super(SelectiveWidget, self).__init__(parent)
         self.name = name
+        self.mode = mode
         self.image_path = image_path
         self.pixmap = QPixmap(image_path)
         self.index = index
+        self.active = active
         self.is_selected = False
         self.setMouseTracking(True)
 
@@ -139,35 +199,59 @@ class SelectiveWidget(QWidget):
         painter.setClipPath(path)
 
         # Draw solid background color
-        painter.setBrush(QBrush(QColor(50, 50, 50, 100)))  # Background color (dark gray)
-        painter.drawRoundedRect(rect, 15, 15)
 
         # Calculate the size to maintain aspect ratio and crop the pixmap to fill the area
-        image_size = self.pixmap.size()
-        image_aspect_ratio = image_size.width() / image_size.height()
-        widget_aspect_ratio = rect.width() / rect.height()
+        if self.mode == "full":
+            image_size = self.pixmap.size()
+            image_aspect_ratio = image_size.width() / image_size.height()
+            widget_aspect_ratio = rect.width() / rect.height()
 
-        if widget_aspect_ratio > image_aspect_ratio:
-            # Widget is wider than image aspect ratio
-            scaled_width = rect.width()
-            scaled_height = scaled_width / image_aspect_ratio
+            if widget_aspect_ratio > image_aspect_ratio:
+                # Widget is wider than image aspect ratio
+                scaled_width = rect.width()
+                scaled_height = scaled_width / image_aspect_ratio
+            else:
+                # Widget is taller than image aspect ratio
+                scaled_height = rect.height()
+                scaled_width = scaled_height * image_aspect_ratio
+
+            x = int((rect.width() - scaled_width) / 2)
+            y = int((rect.height() - scaled_height) / 2)
+
+            painter.drawPixmap(x, y, scaled_width, scaled_height, self.pixmap)
         else:
-            # Widget is taller than image aspect ratio
-            scaled_height = rect.height()
-            scaled_width = scaled_height * image_aspect_ratio
+            # keep aspect ratio and fit the pixmap inside the area
+            image_size = self.pixmap.size()
+            image_aspect_ratio = image_size.width() / image_size.height()
+            widget_aspect_ratio = rect.width() / rect.height()
 
-        x = int((rect.width() - scaled_width) / 2)
-        y = int((rect.height() - scaled_height) / 2)
+            if widget_aspect_ratio > image_aspect_ratio:
+                scaled_height = rect.height()
+                scaled_width = scaled_height * image_aspect_ratio
+            else:
+                scaled_width = rect.width()
+                scaled_height = scaled_width / image_aspect_ratio
 
-        painter.drawPixmap(x, y, scaled_width, scaled_height, self.pixmap)
-        # painter.drawPixmap(rect, cropped_pixmap)
+            x = int((rect.width() - scaled_width) / 2)
+            y = int((rect.height() - scaled_height) / 2)
+
+            scaled_pixmap = self.pixmap.scaled(scaled_width, scaled_height, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            painter.drawPixmap(rect.x() + x, rect.y() + y, scaled_pixmap)
 
         # Draw semi-transparent overlay on hover and selection
         painter.setClipping(False)
+
+        painter.setBrush(QBrush(QColor(10, 10, 10, 100)))  # Background color (dark gray)
+        painter.drawRoundedRect(rect, 15, 15)
+
+        if not self.active:
+            painter.setBrush(QBrush(QColor(0, 100, 100, 100)))  # Background color (dark gray)
+            painter.drawRoundedRect(rect, 15, 15)
+
         if self.is_selected:
             painter.setBrush(QColor(180, 100, 80, 100))
         elif self.underMouse():
-            painter.setBrush(QColor(128, 128, 128, 100))
+            painter.setBrush(QColor(80, 80, 80, 100))
         else:
             painter.setBrush(Qt.transparent)
 

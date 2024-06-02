@@ -50,7 +50,7 @@ cdef class CarCython:
         self.min_speed = min_speed
         self.acceleration = acceleration
         self.turn_speed = math.radians(turn_speed)
-        self.inactive_steps = inactive_steps
+        self.inactive_steps = inactive_steps if inactive_steps > 0 else 1
         self.rays_degrees = np.array(
             [math.radians(ray) for ray in rays_degrees], dtype=np.float32
         )
@@ -202,10 +202,18 @@ cdef class CarCython:
         self.angle = wall_angle
 
         # calculate distance from current car position to the wall
-        cdef move_distance = 1.0 * self.width - self.distance_center_corner * cos(angle_between / 2)
+        cdef float move_distance = 0.2 * self.width # - self.distance_center_corner * cos(angle_between / 2)
+        cdef bint end_trigger = False
         perpendicular_wall_angle -= pi
-        self.x += move_distance * cos(perpendicular_wall_angle)
-        self.y -= move_distance * sin(perpendicular_wall_angle)
+
+        for i in range(10):
+            if not self._does_collide():
+                end_trigger = True
+            self.x += move_distance * cos(perpendicular_wall_angle)
+            self.y -= move_distance * sin(perpendicular_wall_angle)
+
+            if end_trigger:
+                break
 
         # finished :)
 
