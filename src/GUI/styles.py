@@ -18,6 +18,7 @@ BUTTON_STYLE = """
         border: 1px solid #555;
         border-radius: 10px;
         padding: 10px;
+        outline: none;  /* Add this line to remove the focus border */
     }
     QPushButton:hover {
         background-color: #444;
@@ -25,8 +26,37 @@ BUTTON_STYLE = """
     QPushButton:pressed {
         background-color: #555;
     }
+    QPushButton:focus {
+        outline: none;  /* Add this line to remove the focus border */
+    }
 """
 
+TABLE_STYLE = """
+    QTableWidget {
+        background-color: rgba(43, 43, 43, 180);
+        color: #f0f0f0;
+        gridline-color: #444444;
+        border-radius: 15px;
+        font-size: 16x; /* Increase font size here */
+    }
+    QHeaderView::section {
+        background-color: rgba(60, 60, 60, 180);
+        color: #f0f0f0;
+        padding: 4px;
+        border: 1px solid #444444;
+        font-size: 17px; /* Increase header font size */
+    }
+    QTableWidget QTableCornerButton::section {
+        background-color: rgba(60, 60, 60, 180);
+        border: 1px solid #444444;
+    }
+    QTableWidget::item {
+        border-color: #444444;
+    }
+    QTableWidget::item:selected {
+        background-color: #555555;
+    }
+"""
 
 class WidgetBackgroundImage(QWidget):
     def __init__(self, background_image_path, parent=None, alpha_overlay=0.5):

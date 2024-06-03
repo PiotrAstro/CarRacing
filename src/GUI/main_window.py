@@ -4,13 +4,15 @@ from src.GUI.game import GamePage
 from src.GUI.main_menu import MainMenuWidget
 from src.GUI.map_settings import MapSettingsPage
 from src.GUI.player_settings import PlayerSettingsPage
+from src.GUI.ranking import RankingPage
+from src.car_simulator.car_python import CarWrapper
 
 
 class MainWindow(QMainWindow):
     def __init__(self, game_controller):
         super(MainWindow, self).__init__()
         self.setWindowTitle("AI Car Racing")
-        self.setGeometry(100, 100, 800, 600)
+        self.setGeometry(100, 100, 1000, 800)
         self.game_controller = game_controller
 
         # Create the stacked widget
@@ -25,10 +27,12 @@ class MainWindow(QMainWindow):
         self.map_settings_page = MapSettingsPage(self.game_controller, self, self)
         self.player_settings_page = PlayerSettingsPage(self.game_controller, self, self)
         self.game_page = GamePage(self.game_controller, self, self)
+        self.ranking_page = RankingPage(self.game_controller, self, self)
 
         self.stacked_widget.addWidget(self.map_settings_page)
         self.stacked_widget.addWidget(self.player_settings_page)
         self.stacked_widget.addWidget(self.game_page)
+        self.stacked_widget.addWidget(self.ranking_page)
 
     def show_main_menu(self):
         self.stacked_widget.setCurrentWidget(self.main_menu_page)
@@ -43,3 +47,14 @@ class MainWindow(QMainWindow):
         self.game_page.start_game()
         self.stacked_widget.setCurrentWidget(self.game_page)
 
+    def resume_game(self):
+        self.game_page.resume_game()
+        self.stacked_widget.setCurrentWidget(self.game_page)
+
+    def game_brake(self, cars: list[CarWrapper]):
+        self.ranking_page.update_rankings(cars, "brake")
+        self.stacked_widget.setCurrentWidget(self.ranking_page)
+
+    def game_finish(self, cars: list[CarWrapper]):
+        self.ranking_page.update_rankings(cars, "finish")
+        self.stacked_widget.setCurrentWidget(self.ranking_page)

@@ -10,7 +10,7 @@ from src.game_control.game_controller import GameController, CarAIDataHolder
 
 class PlayerSettingsPage(WidgetBackgroundImage):
     def __init__(self, game_controller: GameController, parent, main_window):
-        super(PlayerSettingsPage, self).__init__(MAIN_MENU_BACKGROUND, parent)
+        super(PlayerSettingsPage, self).__init__(MAIN_MENU_BACKGROUND, parent, alpha_overlay=0.25)
         self.game_controller = game_controller
         self.main_window = main_window
         self.player_widgets = []

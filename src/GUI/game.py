@@ -1,12 +1,14 @@
+import math
 import time
+
+from PySide6.QtCore import QRectF, Qt, QTimer
+from PySide6.QtGui import QColor, QFont, QPainter, QPixmap
+from PySide6.QtWidgets import QWidget, QLabel, QVBoxLayout, QHBoxLayout, QPushButton, QSpacerItem, QSizePolicy
+
+from src.GUI.styles import BUTTON_STYLE
 from src.car_simulator.car_cython import CarDrawInfo
 from src.game_control.constants import FPS
 from src.game_control.game_controller import GameController
-
-from PySide6.QtCore import QTimer, QRectF, Qt
-from PySide6.QtGui import QPainter, QColor, QPixmap, QFont
-from PySide6.QtWidgets import QWidget, QLabel, QVBoxLayout, QHBoxLayout
-import math
 
 
 class GamePage(QWidget):
@@ -15,6 +17,7 @@ class GamePage(QWidget):
         self.game_controller = game_controller
         self.main_window = main_window
         self.game_running = False
+        self.game_frozen = False
         self.initUI()
 
         # Update the widget periodically based on the simulation
@@ -29,33 +32,76 @@ class GamePage(QWidget):
         self.car_names = [car.name for car in self.cars]
         self.map_pixmap = QPixmap(self.game_controller.get_map_image())
         self.game_running = True
+        self.game_frozen = False
         self.update_data()
 
+    def resume_game(self):
+        if self.game_frozen and not self.game_running:
+            self.game_frozen = False
+            self.game_running = True
+            self.update_data()
+        else:
+            self.start_game()
+
     def initUI(self):
-        # Layout for the top labels
+        # Main layout
+        main_layout = QVBoxLayout(self)
+
+        # Top layout for menu, time left, and laps
         top_layout = QHBoxLayout()
 
+        # Menu button
+        button_container = QVBoxLayout()
+        self.menu_button = QPushButton("Menu")
+        self.menu_button.setStyleSheet(BUTTON_STYLE)
+        self.menu_button.clicked.connect(self._stop_game)
+        button_container.addWidget(self.menu_button)
+        button_container.addSpacerItem(QSpacerItem(0, 0, QSizePolicy.Minimum, QSizePolicy.Expanding))
+        top_layout.addLayout(button_container)
+        # top_layout.addWidget(self.menu_button)
+
+        # Spacer for centering the time left label
+        top_layout.addStretch()
+
         # Time left label
+        time_left_container = QVBoxLayout()
         self.time_left_label = QLabel("Time left: 0")
         self.time_left_label.setFont(QFont('Arial', 14, QFont.Bold))
         self.time_left_label.setStyleSheet("color: white;")
-        top_layout.addWidget(self.time_left_label)
+        time_left_container.addWidget(self.time_left_label)
+        time_left_container.addSpacerItem(QSpacerItem(0, 0, QSizePolicy.Minimum, QSizePolicy.Expanding))
+        top_layout.addLayout(time_left_container)
+        # top_layout.addWidget(self.time_left_label)
 
-        # Spacer
+        # Spacer to push time left to the center
         top_layout.addStretch()
 
-        # Laps label
+        # Container for laps label
+        laps_container = QVBoxLayout()
         self.laps_label = QLabel("Laps: 0")
         self.laps_label.setFont(QFont('Arial', 14, QFont.Bold))
         self.laps_label.setStyleSheet("color: white;")
-        top_layout.addWidget(self.laps_label)
+        laps_container.addWidget(self.laps_label)
+        laps_container.addSpacerItem(QSpacerItem(0, 0, QSizePolicy.Minimum, QSizePolicy.Expanding))
 
-        # Main layout
-        main_layout = QVBoxLayout()
+        # Add laps container to the top layout
+        top_layout.addLayout(laps_container)
+
+        # Add the top layout to the main layout
         main_layout.addLayout(top_layout)
-        main_layout.addStretch()
+        main_layout.addStretch()  # Ensures the rest of the layout is filled by the game
 
         self.setLayout(main_layout)
+
+    def _stop_game(self):
+        self.game_running = False
+        self.game_frozen = True
+        self.main_window.game_brake(self.cars)
+
+    def _finish_game(self):
+        self.game_running = False
+        self.game_frozen = False
+        self.main_window.game_finish(self.cars)
 
     def update_data(self):
         if self.game_running:
@@ -70,12 +116,14 @@ class GamePage(QWidget):
 
             # Update labels
             self.time_left_label.setText(f"Time left: {time_left:.2f}")
-            self.laps_label.setText("Laps: " + "\n".join(f"{i + 1}: {lap:.2f}" for i, lap in enumerate(laps)))
+            self.laps_label.setText("Laps:\n" + "\n".join(f"{i + 1}: {lap:.2f}" for i, lap in enumerate(laps)))
 
             # Redraw the widget
             self.update()
 
-            if not self.simulation.is_finished():
+            if self.simulation.is_finished():
+                self._finish_game()
+            else:
                 self.simulation.step()
 
     def paintEvent(self, event):
@@ -138,9 +186,7 @@ class GamePage(QWidget):
         painter.rotate(math.degrees(-car_info.angle_radians))
 
         painter.setOpacity(pulsing_opacity)  # Adjust opacity based on inactive ratio
-        painter.drawPixmap(-car_height / 2, - car_width / 2, car_height, car_width, car_image)
-
-
+        painter.drawPixmap(-car_height / 2, -car_width / 2, car_height, car_width, car_image)
 
         # Restore painter state
         painter.restore()
@@ -162,3 +208,15 @@ class GamePage(QWidget):
             return 0.0
         else:
             return 1.0
+
+    def calculate_rankings(self):
+        # Calculate rankings based on some criteria, e.g., distance covered
+        # For simplicity, we return a list of indices representing the rankings
+        rankings = [i for i, _ in sorted(enumerate(self.cars), key=lambda x: x[1].distance, reverse=True)]
+        return rankings
+
+    def keyPressEvent(self, event):
+        if event.key() == Qt.Key_Escape:
+            self._stop_game()
+        else:
+            super().keyPressEvent(event)

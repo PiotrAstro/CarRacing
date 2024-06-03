@@ -23,6 +23,8 @@ PLAYER_CAR_CHANGEABLE_INIT = {
 
 MAX_AI_CARS = 4
 
+
+# initial values, from list element will be chosen randomly
 AI_CAR_CHANGEABLE_INIT = {
     "max_speed": [10, 20],
     "min_speed": -1.0,
@@ -65,7 +67,7 @@ CARS = [
     IMAGES_DIR / "spaceship5.png",
 ]
 
-LAPS_RANGE = (1, 10)
+LAPS_RANGE = (1, 8)
 SECONDS_RANGE = (30, 1200)
 FPS = 60
 DEFAULT_SECONDS = 120
@@ -83,36 +85,25 @@ MAPS = [
         "image": IMAGES_DIR / "map_orion.jpg",
     },
     {
-        "name": "Harder Squazzle",
-        "x": 0,
-        "y": 0,
-        "start_angle": 0,
-        "end_line": ((0, 0), (0, 100)),
-        "false_end_line": ((0, 0), (0, 100)),
+        "name": "Pillars of Creation",
+        "x": 2707,
+        "y": 2007,
+        "start_angle": 95,
+        "end_line": ((2663, 1975), (2748, 1972)),
+        "false_end_line": ((2633, 1940), (2746, 1928)),
+        "start_before_end_line": True,
+        "bounding_map": IMAGES_DIR / "map_eagle.png",
+        "image": IMAGES_DIR / "map_eagle.jpg",
+    },
+    {
+        "name": "Spiral Death",
+        "x": 6496,
+        "y": 1806,
+        "start_angle": 115,
+        "end_line": ((2555, 3622), (2552, 3708)),
+        "false_end_line": ((2525, 3622), (2522, 3708)),
         "start_before_end_line": False,
-        "bounding_map": IMAGES_DIR / "map1_walls.png",
-        "image": IMAGES_DIR / "map_orion.jpg",
-    },
-    {
-        "name": "Harder Squazzle",
-        "x": 0,
-        "y": 0,
-        "start_angle": 0,
-        "end_line": ((0, 0), (0, 100)),
-        "false_end_line": ((0, 0), (0, 100)),
-        "start_before_end_line": True,
-        "bounding_map": IMAGES_DIR / "map1_walls.png",
-        "image": IMAGES_DIR / "map_orion.jpg",
-    },
-    {
-        "name": "Harder Squazzle",
-        "x": 0,
-        "y": 0,
-        "start_angle": 0,
-        "end_line": ((0, 0), (0, 100)),
-        "false_end_line": ((0, 0), (0, 100)),
-        "start_before_end_line": True,
-        "bounding_map": IMAGES_DIR / "map1_walls.png",
-        "image": IMAGES_DIR / "map_orion.jpg",
+        "bounding_map": IMAGES_DIR / "map_quintet.png",
+        "image": IMAGES_DIR / "map_quintet.jpg",
     },
 ]

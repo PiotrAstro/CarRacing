@@ -25,6 +25,7 @@ class CarWrapper(ABC):
     false_end_line_balance: int
     time_counter: int
     max_laps: int
+    distance: float
 
     def __init__(self, car_init_data: dict[str, Any], end_line: Line, false_end_line: Line, start_before_end_line: bool, max_laps: int, name: str, image: Path):
         self.car = CarCython(**car_init_data)
@@ -39,6 +40,7 @@ class CarWrapper(ABC):
         self.previous_position = self.car.get_position()
         self.time_counter = 0
         self.max_laps = max_laps
+        self.distance = 0.0
 
     def get_car_draw_info(self) -> CarDrawInfo:
         return self.car.get_draw_info()
@@ -65,12 +67,14 @@ class CarWrapper(ABC):
             if len(self._laps) >= self.max_laps:
                 if self.car.get_speed() < 0.01:
                     self.car.stop()
+                    steering = 0.0
                     engine = 0.0
                 else:
                     engine = -1.0
             self.car.react(engine, steering)
             self.car.step()
             self._laps_calculations()
+            self.distance += self.car.get_speed()
         else:
             self.car.step()
 
@@ -101,6 +105,19 @@ class CarWrapper(ABC):
                 self.false_end_line_balance -= 1
 
         self.previous_position = new_position
+
+    def __gt__(self, other):
+        if not isinstance(other, CarWrapper):
+            return NotImplemented
+
+        if len(self._laps) > len(other._laps):
+            return True
+        elif len(self._laps) == len(other._laps):
+            if len(self._laps) == self.max_laps:
+                return self._laps[-1] > other._laps[-1]
+            else:
+                return self.distance > other.distance
+        return False
 
 
 class CarPlayerWrapper(CarWrapper):
